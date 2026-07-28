@@ -83,14 +83,18 @@ mkdir -p /code/microbin_data
 t "Building microbin (debug)..."
 if "$CARGO" build 2>&1 | tee /tmp/cargo-build.log; then
   t "Build OK"
-elif [ -x "$BIN" ]; then
-  # Degrade rather than abort: a preview of the wrong code still beats no
-  # preview, but say so loudly — the run is no longer testing this branch.
-  t "  WARN: cargo build FAILED — falling back to the binary baked into the image"
-  t "  WARN: this preview does NOT reflect the code changes on this branch"
-  tail -40 /tmp/cargo-build.log | tee -a "$LOG" || true
 else
-  t "ERROR: cargo build failed and there is no prebuilt binary to fall back to:"
+  # Fail the preview rather than degrade to the binary baked into the image.
+  #
+  # That baked binary was compiled from master, so starting it would hand the
+  # verifier a perfectly healthy preview of the WRONG code: it would click
+  # around a working master and could report PASS on a branch that does not
+  # even compile. A false green is worse than no preview.
+  #
+  # A build failure is itself a useful verdict — surface it instead of hiding
+  # it behind a working-looking URL.
+  t "ERROR: cargo build failed. Refusing to fall back to the binary baked into"
+  t "       the image — that would preview master, not this branch."
   tail -60 /tmp/cargo-build.log | tee -a "$LOG" || true
   exit 1
 fi
